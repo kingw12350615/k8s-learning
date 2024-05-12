@@ -1,0 +1,71 @@
+# 配置Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels: # 为Deployment添加标签
+    app: currency-exchange
+  name: currency-exchange
+  namespace: default
+spec: # 配置Deployment的规范
+  replicas: 1 # 副本数
+  selector:
+    matchLabels:
+      app: currency-exchange
+  strategy: # 配置滚动更新策略
+    rollingUpdate:
+      maxSurge: 25% # 最大增加数，如果设置为25%，则可以增加25%的Pod实例数，像是4个Pod实例的Deployment，最大增加数为1，那么最大增加数为4*25% = 1个Pod实例
+      maxUnavailable: 25% # 最大不可用数，如果设置为25%，则可以减少25%的Pod实例数
+    type: RollingUpdate
+  template: # 配置Pod模板
+    metadata:
+      labels:
+        app: currency-exchange
+    spec:
+      containers:
+        - image: andy880712/mmv3-currency-exchange-service:0.0.12-SNAPSHOT
+          imagePullPolicy: Always
+          name: mmv3-currency-exchange-service
+          resources:
+            limits:
+              cpu: 100m # 限制CPU使用量
+              ephemeral-storage: 1Gi
+              memory: 1Gi
+            requests:
+              cpu: 100m # 请求CPU使用量
+              ephemeral-storage: 1Gi
+              memory: 1Gi
+          # 配置存活探针
+          livenessProbe:
+            httpGet:
+              path: /actuator/health/liveness
+              port: 8000
+          # 配置就绪探针
+          readinessProbe:
+            httpGet:
+              path: /actuator/health/readiness
+              port: 8000
+          # 配置启动探针
+          startupProbe:
+            httpGet:
+              path: /actuator/health/liveness
+              port: 8000
+            failureThreshold: 30 # 失败阈值
+            periodSeconds: 10 # 周期时间
+---
+# 配置Service
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: currency-exchange
+  name: currency-exchange
+  namespace: default
+spec:
+  ports:
+    - port: 8000 # 端口
+      protocol: TCP 
+      targetPort: 8000 # 目标端口
+  selector:
+    app: currency-exchange
+  sessionAffinity: None # 会话亲和性
+  type: LoadBalancer # 服务类型
